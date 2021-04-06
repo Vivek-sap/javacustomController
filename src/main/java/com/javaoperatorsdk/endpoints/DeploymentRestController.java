@@ -26,7 +26,7 @@ public class DeploymentRestController {
 	@Autowired
 	private DeploymentService service;
 	
-	@GetMapping(path = "namespace/{namespace}/label/labelValue/{labelkey}/labelValue/{labelValue}", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(path = "namespace/{namespace}/label/labelkey/{labelkey}/labelValue/{labelValue}", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<DeploymentResult> getDeploymentByNamespaceAndLabel(@Valid @PathVariable String namespace,
 			@Valid @PathVariable String labelkey, @Valid @PathVariable String labelValue) {
 		logger.log(Level.INFO, "Fetching the pod deployment information by namespace={} and labelkey={} and labelValue={}"  +  namespace);
