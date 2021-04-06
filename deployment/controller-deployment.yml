@@ -1,0 +1,42 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: controller
+  labels:
+    name: controller
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:           
+    app: controller
+    tier: controller
+  clusterIP: None  # We Use DNS, Thus ClusterIP is not relevant       
+
+---
+apiVersion: apps/v1 
+kind: Deployment    
+metadata:              
+  name: controller
+spec:                
+  selector:         
+    matchLabels:
+      app: controller
+  replicas: 1        
+  template:
+    metadata:
+      labels:        
+        app:  controller
+        tier: controller
+    spec:
+      containers:
+        - name:  controller
+          image: springboot-k8s-controller:1.0
+          ports:
+            - containerPort: 8080                
+          env:   # Setting Enviornmental Variables
+          - name: COUNTER_HOST   # Setting Database host address from configMap
+            valueFrom: 
+              configMapKeyRef:
+                name: counter-conf  # name of configMap
+                key: host     
