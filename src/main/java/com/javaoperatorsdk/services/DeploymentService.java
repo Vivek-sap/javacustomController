@@ -17,10 +17,10 @@ public class DeploymentService {
 	}
 
 	public DeploymentResult getPodByNamespaceAndLabel(String namespace, String labelkey, String labelValue) {
-		DeploymentResult result = new DeploymentResult();
+		DeploymentResult result = new DeploymentResult(null);
 		PodList podList = client.pods().inNamespace(namespace).withLabel(labelkey, labelValue).list();
 		if (podList != null && podList.getItems() != null) {
-			result.setResult(podList.getItems().size());
+			result.setResult(String.valueOf(podList.getItems().size()));
 		}
 		return result;
 	}
