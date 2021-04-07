@@ -10,13 +10,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.stereotype.Component;
-
-import io.fabric8.kubernetes.client.informers.cache.Cache;
 import com.javaoperatorsdk.model.PodSet;
 import com.javaoperatorsdk.model.PodSetList;
 import com.javaoperatorsdk.model.PodSetStatus;
@@ -24,60 +17,37 @@ import com.javaoperatorsdk.model.PodSetStatus;
 import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
-import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.informers.ResourceEventHandler;
 import io.fabric8.kubernetes.client.informers.SharedIndexInformer;
-import io.fabric8.kubernetes.client.informers.SharedInformerFactory;
+import io.fabric8.kubernetes.client.informers.cache.Cache;
 import io.fabric8.kubernetes.client.informers.cache.Lister;
 
-public class PodSetController implements Runnable {
+public class PodSetController {
 
 	private final BlockingQueue<String> workqueue;
-	private  SharedIndexInformer<PodSet> podSetInformer;
-	private  SharedIndexInformer<Pod> podInformer;
-	private  Lister<PodSet> podSetLister;
-	private  Lister<Pod> podLister;
-	private final KubernetesClient client = new DefaultKubernetesClient();
+	private SharedIndexInformer<PodSet> podSetInformer;
+	private SharedIndexInformer<Pod> podInformer;
+	private Lister<PodSet> podSetLister;
+	private Lister<Pod> podLister;
+	private final KubernetesClient client ;
 	private MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient;
 	public static final Logger logger = Logger.getLogger(PodSetController.class.getName());
 	public static final String APP_LABEL = "app";
 	public static final String DEFAULT_NAME_SAPCE = "default";
 
-	public PodSetController() {		
+	public PodSetController(KubernetesClient client,
+			MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient, SharedIndexInformer<Pod> podInformer,
+			SharedIndexInformer<PodSet> podSetInformer, String namespace) {
+		this.client = client;
+		this.podSetClient = podSetClient;
+		this.podSetLister = new Lister<>(podSetInformer.getIndexer(), namespace);
+		this.podSetInformer = podSetInformer;
+		this.podLister = new Lister<>(podInformer.getIndexer(), namespace);
+		this.podInformer = podInformer;
 		this.workqueue = new ArrayBlockingQueue<>(1024);
-	}
-	
-	@Override
-	public void run() {
-		String namespace = client.getNamespace();
-		if (namespace == null) {
-			logger.log(Level.INFO, "No namespace found via config, assuming default.");
-			namespace = "default";
-		}
-
-		logger.log(Level.INFO, "Using namespace : " + namespace);
-		SharedInformerFactory informerFactory = client.informers();
-		
-		podSetClient = client.customResources(PodSet.class,
-				PodSetList.class);
-		podInformer = informerFactory.sharedIndexInformerFor(Pod.class,
-				10 * 60 * 1000);
-		podSetInformer = informerFactory
-				.sharedIndexInformerForCustomResource(PodSet.class, 10 * 60 * 1000);
-		
-		podLister = new Lister<>(this.podInformer.getIndexer(), namespace);
-		podSetLister = new Lister<>(podSetInformer.getIndexer(), namespace);
-		
-		
-		create();
-		client.informers().startAllRegisteredInformers();
-		client.informers().addSharedInformerEventListener(
-				exception -> logger.log(Level.SEVERE, "Exception occurred, but caught", exception));
-
-		run();
 	}
 
 	public void create() {
@@ -119,7 +89,7 @@ public class PodSetController implements Runnable {
 		});
 	}
 
-	public void runService() {
+	public void run() {
 		logger.log(Level.INFO, "Starting PodSet controller");
 		while (!podInformer.hasSynced() || !podSetInformer.hasSynced()) {
 			// Wait till Informer syncs
@@ -258,5 +228,4 @@ public class PodSetController implements Runnable {
 		return null;
 	}
 
-	
 }

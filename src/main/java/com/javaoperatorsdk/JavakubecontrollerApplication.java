@@ -5,12 +5,11 @@ import java.util.logging.Logger;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
-import com.javaoperatorsdk.controller.PodSetController;
+import com.javaoperatorsdk.controller.PodSetOperatorMain;
 
 @SpringBootApplication
 public class JavakubecontrollerApplication {
@@ -30,7 +29,7 @@ public class JavakubecontrollerApplication {
 	public CommandLineRunner schedulingRunner(TaskExecutor executor) {
 	    return new CommandLineRunner() {
 	        public void run(String... args) throws Exception {
-	            executor.execute(new PodSetController());
+	            executor.execute(new PodSetOperatorMain());
 	        }
 	    };
 	}
