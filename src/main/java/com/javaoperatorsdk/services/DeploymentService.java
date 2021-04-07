@@ -20,7 +20,7 @@ public class DeploymentService {
 		DeploymentResult result = new DeploymentResult(null);
 		PodList podList = client.pods().inNamespace(namespace).withLabel(labelkey, labelValue).list();
 		if (podList != null && podList.getItems() != null) {
-			result.setResult(String.valueOf(podList.getItems().size()));
+			result.setDeploymentCount(String.valueOf(podList.getItems().size()));
 		}
 		return result;
 	}

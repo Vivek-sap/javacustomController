@@ -2,22 +2,24 @@ package com.javaoperatorsdk.model;
 
 public class DeploymentResult {
 
-	private String result;
+	private String deploymentCount;
 
 	public DeploymentResult() {
 	}
 	
-	public DeploymentResult(String result) {
-		this.result = result;
+	public DeploymentResult(String deploymentCount) {
+		this.deploymentCount = deploymentCount;
 	}
 
-	public String getResult() {
-		return result;
+	public String getDeploymentCount() {
+		return deploymentCount;
 	}
 
-	public void setResult(String result) {
-		this.result = result;
+	public void setDeploymentCount(String deploymentCount) {
+		this.deploymentCount = deploymentCount;
 	}
+
+	
 	
 	
 }
