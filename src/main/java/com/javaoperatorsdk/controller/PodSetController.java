@@ -10,7 +10,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import io.fabric8.kubernetes.client.informers.cache.Cache;
@@ -21,6 +20,7 @@ import com.javaoperatorsdk.model.PodSetStatus;
 import io.fabric8.kubernetes.api.model.OwnerReference;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodBuilder;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Resource;
@@ -28,7 +28,7 @@ import io.fabric8.kubernetes.client.informers.ResourceEventHandler;
 import io.fabric8.kubernetes.client.informers.SharedIndexInformer;
 import io.fabric8.kubernetes.client.informers.cache.Lister;
 
-
+@Component
 public class PodSetController {
 
 	private final BlockingQueue<String> workqueue;
@@ -36,21 +36,30 @@ public class PodSetController {
 	private final SharedIndexInformer<Pod> podInformer;
 	private final Lister<PodSet> podSetLister;
 	private final Lister<Pod> podLister;
-	private final KubernetesClient kubernetesClient;
+	private final KubernetesClient client = new DefaultKubernetesClient();
 	private final MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient;
 	public static final Logger logger = Logger.getLogger(PodSetController.class.getName());
 	public static final String APP_LABEL = "app";
+	public static final String DEFAULT_NAME_SAPCE = "default";
 
-	public PodSetController(KubernetesClient kubernetesClient,
-			MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient, SharedIndexInformer<Pod> podInformer,
-			SharedIndexInformer<PodSet> podSetInformer, String namespace) {
-		this.kubernetesClient = kubernetesClient;
-		this.podSetClient = podSetClient;
-		this.podSetLister = new Lister<>(podSetInformer.getIndexer(), namespace);
-		this.podSetInformer = podSetInformer;
-		this.podLister = new Lister<>(podInformer.getIndexer(), namespace);
-		this.podInformer = podInformer;
+	public PodSetController() {
+		this.podSetClient = client.customResources(PodSet.class,PodSetList.class);
+		this.podSetInformer = client.informers()
+				.sharedIndexInformerForCustomResource(PodSet.class, 10 * 60 * 1000);
+		this.podInformer = client.informers().sharedIndexInformerFor(Pod.class,
+				10 * 60 * 1000);
+		this.podLister = new Lister<>(this.podInformer.getIndexer(), DEFAULT_NAME_SAPCE);
+		this.podSetLister = new Lister<>(this.podSetInformer.getIndexer(), DEFAULT_NAME_SAPCE);
 		this.workqueue = new ArrayBlockingQueue<>(1024);
+	}
+	
+	public void init() {
+		create();
+		client.informers().startAllRegisteredInformers();
+		client.informers().addSharedInformerEventListener(
+				exception -> logger.log(Level.SEVERE, "Exception occurred, but caught", exception));
+
+		run();
 	}
 
 	public void create() {
@@ -150,7 +159,7 @@ public class PodSetController {
 		int diff = existingPods - podSet.getSpec().getReplicas();
 		for (; diff > 0; diff--) {
 			String podName = pods.remove(0);
-			kubernetesClient.pods().inNamespace(podSet.getMetadata().getNamespace()).withName(podName).delete();
+			client.pods().inNamespace(podSet.getMetadata().getNamespace()).withName(podName).delete();
 		}
 
 		// Update PodSet status
@@ -160,7 +169,7 @@ public class PodSetController {
 	private void createPods(int numberOfPods, PodSet podSet) {
 		for (int index = 0; index < numberOfPods; index++) {
 			Pod pod = createNewPod(podSet);
-			kubernetesClient.pods().inNamespace(podSet.getMetadata().getNamespace()).create(pod);
+			client.pods().inNamespace(podSet.getMetadata().getNamespace()).create(pod);
 		}
 	}
 
