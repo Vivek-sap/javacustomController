@@ -10,6 +10,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Component;
 
 import io.fabric8.kubernetes.client.informers.cache.Cache;
@@ -26,34 +30,48 @@ import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.fabric8.kubernetes.client.informers.ResourceEventHandler;
 import io.fabric8.kubernetes.client.informers.SharedIndexInformer;
+import io.fabric8.kubernetes.client.informers.SharedInformerFactory;
 import io.fabric8.kubernetes.client.informers.cache.Lister;
 
-@Component
-public class PodSetController {
+public class PodSetController implements Runnable {
 
 	private final BlockingQueue<String> workqueue;
-	private final SharedIndexInformer<PodSet> podSetInformer;
-	private final SharedIndexInformer<Pod> podInformer;
-	private final Lister<PodSet> podSetLister;
-	private final Lister<Pod> podLister;
+	private  SharedIndexInformer<PodSet> podSetInformer;
+	private  SharedIndexInformer<Pod> podInformer;
+	private  Lister<PodSet> podSetLister;
+	private  Lister<Pod> podLister;
 	private final KubernetesClient client = new DefaultKubernetesClient();
-	private final MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient;
+	private MixedOperation<PodSet, PodSetList, Resource<PodSet>> podSetClient;
 	public static final Logger logger = Logger.getLogger(PodSetController.class.getName());
 	public static final String APP_LABEL = "app";
 	public static final String DEFAULT_NAME_SAPCE = "default";
 
-	public PodSetController() {
-		this.podSetClient = client.customResources(PodSet.class,PodSetList.class);
-		this.podSetInformer = client.informers()
-				.sharedIndexInformerForCustomResource(PodSet.class, 10 * 60 * 1000);
-		this.podInformer = client.informers().sharedIndexInformerFor(Pod.class,
-				10 * 60 * 1000);
-		this.podLister = new Lister<>(this.podInformer.getIndexer(), DEFAULT_NAME_SAPCE);
-		this.podSetLister = new Lister<>(this.podSetInformer.getIndexer(), DEFAULT_NAME_SAPCE);
+	public PodSetController() {		
 		this.workqueue = new ArrayBlockingQueue<>(1024);
 	}
 	
-	public void init() {
+	@Override
+	public void run() {
+		String namespace = client.getNamespace();
+		if (namespace == null) {
+			logger.log(Level.INFO, "No namespace found via config, assuming default.");
+			namespace = "default";
+		}
+
+		logger.log(Level.INFO, "Using namespace : " + namespace);
+		SharedInformerFactory informerFactory = client.informers();
+		
+		podSetClient = client.customResources(PodSet.class,
+				PodSetList.class);
+		podInformer = informerFactory.sharedIndexInformerFor(Pod.class,
+				10 * 60 * 1000);
+		podSetInformer = informerFactory
+				.sharedIndexInformerForCustomResource(PodSet.class, 10 * 60 * 1000);
+		
+		podLister = new Lister<>(this.podInformer.getIndexer(), namespace);
+		podSetLister = new Lister<>(podSetInformer.getIndexer(), namespace);
+		
+		
 		create();
 		client.informers().startAllRegisteredInformers();
 		client.informers().addSharedInformerEventListener(
@@ -101,7 +119,7 @@ public class PodSetController {
 		});
 	}
 
-	public void run() {
+	public void runService() {
 		logger.log(Level.INFO, "Starting PodSet controller");
 		while (!podInformer.hasSynced() || !podSetInformer.hasSynced()) {
 			// Wait till Informer syncs
@@ -239,4 +257,6 @@ public class PodSetController {
 		}
 		return null;
 	}
+
+	
 }
